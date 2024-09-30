@@ -2,34 +2,84 @@ version: 2
 
 env:
   - GO111MODULE=on
+  - GOARM64=v8.0,lse,crypto
+  - CFLAGS="-O3"
+  - CXXFLAGS="-O3"
+
 before:
   hooks:
     - go mod download
+
 builds:
-  -
-    env:
+  - env:
       - CGO_ENABLED=0
     goos:
       - linux
+    ldflags: -s -w
     goarch:
       - amd64
+      - arm64
+    main: ./cmd/gemini
+    goamd64:
+      - v3
+
 archives:
   - name_template: '{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}'
+    files:
+      - README.md
+      - CHANGELOG.md
+      - LICENSE
+
+source:
+  enabled: true
+  format: 'tar.gz'
 
 checksum:
   name_template: 'checksums.txt'
 
 snapshot:
-  name_template: "{{ .Tag }}-next"
+  name_template: '{{ .Tag }}-next'
 
 changelog:
   sort: asc
   filters:
     exclude:
-    - '^docs:'
-    - '^test:'
+      - '^docs:'
+      - '^test:'
 
 dockers:
   - image_templates:
-      - scylladb/gemini:{{ .Tag }}
-      - scylladb/gemini:latest
+      - codelieutenant/gemini:{{ .Version }}-amd64
+    goarch: amd64
+    goamd64: v3
+    goos: linux
+    id: gemini-amd64
+    build_flag_templates:
+      - '--platform=linux/amd64'
+
+  - image_templates:
+      - codelieutenant/gemini:{{ .Version }}-arm64v8
+    goarch: arm64
+    id: gemini-arm
+    goos: linux
+    build_flag_templates:
+      - '--platform=linux/arm64/v8'
+
+docker_manifests:
+  - name_template: 'codelieutenant/gemini:{{ .Version }}'
+    skip_push: false
+    image_templates:
+      - 'codelieutenant/gemini:{{ .Version }}-amd64'
+      - 'codelieutenant/gemini:{{ .Version }}-arm64v8'
+
+  - name_template: 'codelieutenant/gemini:latest'
+    skip_push: false
+    image_templates:
+      - 'codelieutenant/gemini:{{ .Version }}-amd64'
+      - 'codelieutenant/gemini:{{ .Version }}-arm64v8'
+
+release:
+  mode: keep-existing
+  make_latest: true
+  prerelease: auto
+  skip_upload: false
