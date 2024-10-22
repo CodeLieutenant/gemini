@@ -63,6 +63,7 @@ CQL_FEATURES := normal
 CONCURRENCY := 1
 DURATION := 10m
 WARMUP := 1m
+SEED := $(shell date +%s | tee ./results/gemini_seed)
 
 .PHONY: integration-test
 integration-test:
@@ -71,7 +72,7 @@ integration-test:
 	./bin/gemini \
 		--fail-fast \
 		--dataset-size=small \
-		--seed=$(shell date +%s | tee ./results/gemini_seed) \
+		--seed=$(SEED) \
 		--test-cluster=$(shell docker inspect --format='{{ .NetworkSettings.Networks.gemini.IPAddress }}' gemini-test) \
 		--oracle-cluster=$(shell docker inspect --format='{{ .NetworkSettings.Networks.gemini.IPAddress }}' gemini-oracle) \
 		--outfile ./results/gemini_result.log \

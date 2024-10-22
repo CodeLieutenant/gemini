@@ -3,8 +3,19 @@ name: Gemini Integrations Tests
 on:
   push:
     branches: [master]
+    paths:
+      - pkg/**/*.go
+      - cmd/**/*.go
+      - go.mod
+      - go.sum
+
   pull_request:
     branches: [master]
+    paths:
+      - pkg/**/*.go
+      - cmd/**/*.go
+      - go.mod
+      - go.sum
 
 jobs:
   build:
@@ -34,6 +45,7 @@ jobs:
         gemini-concurrency: [16]
         oracle-scylla-version: ["6.1.1"]
         test-scylla-version: ["6.1.1"]
+        seeds: ["random", "60"]
       fail-fast: false
     steps:
       - uses: actions/checkout@v4
@@ -48,11 +60,16 @@ jobs:
       - name: Test
         shell: bash
         run: |
-          make integration-test \
-            CONCURRENCY=${{ matrix.gemini-concurrency }} \
-            CQL_FEATURES=${{ matrix.gemini-features }} \
-            DURATION=5m
+          export CONCURRENCY=${{ matrix.gemini-concurrency }}
+          export CQL_FEATURES=${{ matrix.gemini-features }}
+          export DURATION=5m
+          if [[ ${{ matrix.seed }} != "random" ]]; then
+            make integration-test SEED=${{ matrix.seed }}
+          else
+            make integration-test
+
       - name: Shutdown ScyllaDB
+        if: always()
         run: |
           make scylla-shutdown \
             SCYLLA_TEST_VERSION=${{ matrix.test-scylla-version }} \
