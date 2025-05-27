@@ -33,10 +33,12 @@ type (
 	}
 )
 
-func New(distribution string, size, seed uint64, mu, sigma float64) (DistributionFunc, error) {
+func New(distribution string, size, seed uint64, mu, sigma float64) (rand.Source, DistributionFunc, error) {
 	var rnd generator
 
-	hash := sha256.Sum256([]byte(distribution + strconv.FormatUint(size, 10) + strconv.FormatUint(seed, 10) + strconv.FormatFloat(mu, 'f', -1, 64) + strconv.FormatFloat(sigma, 'f', -1, 64)))
+	hash := sha256.Sum256(
+		[]byte(distribution + strconv.FormatUint(size, 10) + strconv.FormatUint(seed, 10) + strconv.FormatFloat(mu, 'f', -1, 64) + strconv.FormatFloat(sigma, 'f', -1, 64)),
+	)
 
 	src := rand.NewChaCha8(hash)
 
@@ -45,21 +47,21 @@ func New(distribution string, size, seed uint64, mu, sigma float64) (Distributio
 		rnd = rand.NewZipf(rand.New(src), 1.001, float64(size), size)
 	case "normal":
 		rnd = Normal{
-			Src:   src,
+			Src:   rand.New(src),
 			Mu:    mu,
 			Sigma: sigma,
 		}
 	case "uniform":
 		rnd = Uniform{
-			Src: src,
-			Min: 1,
+			Src: rand.New(src),
+			Min: 0,
 			Max: math.MaxUint64,
 		}
 	default:
-		return nil, errors.Errorf("unsupported distribution: %s", distribution)
+		return nil, nil, errors.Errorf("unsupported distribution: %s", distribution)
 	}
 
-	return func() TokenIndex {
+	return src, func() TokenIndex {
 		return TokenIndex(rnd.Uint64())
 	}, nil
 }

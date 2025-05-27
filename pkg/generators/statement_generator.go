@@ -27,7 +27,7 @@ import (
 
 func GenSchema(sc typedef.SchemaConfig, seed uint64) *typedef.Schema {
 	r := rand.New(rand.NewPCG(seed, seed))
-	builder := builders.NewSchemaBuilder()
+	builder := builders.SchemaBuilder{}
 	builder.Config(sc)
 	keyspace := typedef.Keyspace{
 		Name:              "ks1",
