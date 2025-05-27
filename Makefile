@@ -13,7 +13,7 @@ BUILD_DATE ?= $(shell git log -1 --format=%cd --date=format:%Y-%m-%dT%H:%M:%SZ 2
 LDFLAGS_VERSION := -X main.version=$(VERSION) -X main.commit=$(COMMIT) -X main.date=$(BUILD_DATE)
 
 CQL_FEATURES ?= normal
-CONCURRENCY ?= 16
+CONCURRENCY ?= 4
 DURATION ?= 10m
 WARMUP ?= 0
 MODE ?= mixed
@@ -30,11 +30,11 @@ GEMINI_FLAGS ?= --fail-fast \
 	--level=info \
 	--consistency=QUORUM \
 	--test-host-selection-policy=token-aware \
-	--oracle-host-selection-policy=round-robin \
+	--oracle-host-selection-policy=token-aware \
 	--mode=$(MODE) \
 	--request-timeout=5s \
 	--connect-timeout=15s \
-	--use-server-timestamps=false \
+	--use-server-timestamps=true \
 	--async-objects-stabilization-attempts=10 \
 	--max-mutation-retries=10 \
 	--replication-strategy="{'class': 'NetworkTopologyStrategy', 'replication_factor': '1'}" \
@@ -48,6 +48,9 @@ GEMINI_FLAGS ?= --fail-fast \
 	--warmup=$(WARMUP) \
 	--profiling-port=6060 \
 	--drop-schema=true \
+	--token-range-slices=4096 \
+	--partition-key-buffer-reuse-size=128 \
+	--partition-key-distribution=zipf \
 	--oracle-statement-log-file=$(PWD)/results/oracle-statements.log.zst \
 	--test-statement-log-file=$(PWD)/results/test-statements.log.zst \
 	--statement-log-file-compression=zstd

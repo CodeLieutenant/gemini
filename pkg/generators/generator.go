@@ -243,9 +243,10 @@ func (g *Generator) fillAllPartitions(ctx context.Context) {
 		if !partition.push(v).Full {
 			g.valuesMetrics.Inc(v)
 			metrics.GeneratorEmittedValues.WithLabelValues(g.table.Name, idxStr).Inc()
-		} else {
-			metrics.GeneratorDroppedValues.WithLabelValues(g.table.Name, "new").Inc()
+			continue
 		}
+
+		metrics.GeneratorDroppedValues.WithLabelValues(g.table.Name, "new").Inc()
 
 		if !pFilled[idx] {
 			pFilled[idx] = true

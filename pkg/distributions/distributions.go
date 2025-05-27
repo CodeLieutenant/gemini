@@ -15,8 +15,10 @@
 package distributions
 
 import (
+	"crypto/sha256"
 	"math"
 	"math/rand/v2"
+	"strconv"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -34,7 +36,9 @@ type (
 func New(distribution string, size, seed uint64, mu, sigma float64) (DistributionFunc, error) {
 	var rnd generator
 
-	src := rand.NewPCG(seed, seed)
+	hash := sha256.Sum256([]byte(distribution + strconv.FormatUint(size, 10) + strconv.FormatUint(seed, 10) + strconv.FormatFloat(mu, 'f', -1, 64) + strconv.FormatFloat(sigma, 'f', -1, 64)))
+
+	src := rand.NewChaCha8(hash)
 
 	switch strings.ToLower(distribution) {
 	case "zipf":
@@ -48,7 +52,7 @@ func New(distribution string, size, seed uint64, mu, sigma float64) (Distributio
 	case "uniform":
 		rnd = Uniform{
 			Src: src,
-			Min: 0,
+			Min: 1,
 			Max: math.MaxUint64,
 		}
 	default:
