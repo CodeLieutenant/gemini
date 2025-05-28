@@ -13,9 +13,9 @@ BUILD_DATE ?= $(shell git log -1 --format=%cd --date=format:%Y-%m-%dT%H:%M:%SZ 2
 LDFLAGS_VERSION := -X main.version=$(VERSION) -X main.commit=$(COMMIT) -X main.date=$(BUILD_DATE)
 
 CQL_FEATURES ?= normal
-CONCURRENCY ?= 4
+CONCURRENCY ?= 16
 DURATION ?= 10m
-WARMUP ?= 0
+WARMUP ?= 2m
 MODE ?= mixed
 DATASET_SIZE ?= large
 GEMINI_SEED := $(shell echo $$((RANDOM % 100 + 1)))
@@ -48,8 +48,8 @@ GEMINI_FLAGS ?= --fail-fast \
 	--warmup=$(WARMUP) \
 	--profiling-port=6060 \
 	--drop-schema=true \
-	--token-range-slices=4096 \
-	--partition-key-buffer-reuse-size=128 \
+	--token-range-slices=10000 \
+	--partition-key-buffer-reuse-size=100 \
 	--partition-key-distribution=uniform \
 	--oracle-statement-log-file=$(PWD)/results/oracle-statements.log.zst \
 	--test-statement-log-file=$(PWD)/results/test-statements.log.zst \

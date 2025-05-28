@@ -16,7 +16,6 @@ package distributions
 
 import (
 	"crypto/sha256"
-	"math"
 	"math/rand/v2"
 	"strconv"
 	"strings"
@@ -52,11 +51,7 @@ func New(distribution string, size, seed uint64, mu, sigma float64) (rand.Source
 			Sigma: sigma,
 		}
 	case "uniform":
-		rnd = Uniform{
-			Src: rand.New(src),
-			Min: 0,
-			Max: math.MaxUint64,
-		}
+		rnd = rand.New(src)
 	default:
 		return nil, nil, errors.Errorf("unsupported distribution: %s", distribution)
 	}
