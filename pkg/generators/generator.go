@@ -20,8 +20,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/scylladb/gemini/pkg/utils"
-
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 
@@ -196,7 +194,6 @@ const sleepTime = 5 * time.Millisecond
 // at least once since the function started and before it ended.
 // In other words no partition will be starved.
 func (g *Generator) fillAllPartitions(ctx context.Context) {
-	var buffer [24]byte
 	var dropped uint64
 
 	for {
@@ -215,7 +212,6 @@ func (g *Generator) fillAllPartitions(ctx context.Context) {
 
 		idx := g.shardOf(token)
 
-		idxStr := utils.FormatString(buffer[:], idx)
 
 		partition := &g.partitions[idx]
 		if partition.Stale() || partition.inFlight.Has(token) {
@@ -228,7 +224,6 @@ func (g *Generator) fillAllPartitions(ctx context.Context) {
 
 		if pushed {
 			g.valuesMetrics.Inc(v)
-			metrics.GeneratorEmittedValues.WithLabelValues(g.table.Name, idxStr).Inc()
 		} else {
 			metrics.GeneratorDroppedValues.WithLabelValues(g.table.Name, "new").Inc()
 			fullPartitions := g.partitions.FullValues()
