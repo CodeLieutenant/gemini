@@ -226,8 +226,6 @@ func (g *Generator) fillAllPartitions(ctx context.Context) {
 		pushed := !partition.push(v).Full
 		running.Record()
 
-		metrics.GeneratorCreatedValues.WithLabelValues(g.table.Name, idxStr).Inc()
-
 		if pushed {
 			g.valuesMetrics.Inc(v)
 			metrics.GeneratorEmittedValues.WithLabelValues(g.table.Name, idxStr).Inc()
