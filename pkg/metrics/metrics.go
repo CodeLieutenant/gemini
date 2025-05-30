@@ -273,6 +273,24 @@ func StartMetricsServer(ctx context.Context, bind string, logger *zap.Logger) {
 	}()
 }
 
+type RunningTime struct {
+	start time.Time
+	task  string
+}
+
+func ExecutionTimeStart(task string) RunningTime {
+	return RunningTime{
+		start: time.Now(),
+		task:  task,
+	}
+}
+
+func (r RunningTime) Record() {
+	executionTime.
+		WithLabelValues(r.task).
+		Observe(float64(time.Since(r.start).Microseconds()))
+}
+
 func ExecutionTime(task string, callback func()) {
 	start := time.Now()
 
