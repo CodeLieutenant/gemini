@@ -88,27 +88,28 @@ func NewValidation(
 	}
 }
 
-func (v *Validation) run(ctx context.Context, metric prometheus.Counter) (int, error) {
+func (v *Validation) run(ctx context.Context, metric prometheus.Counter) error {
 	var acc error
 
 	stmt, stmtErr := v.statement.Select(ctx)
 	if errors.Is(stmtErr, utils.ErrNoPartitionKeyValues) {
-		return 0, utils.ErrNoPartitionKeyValues
+		return utils.ErrNoPartitionKeyValues
 	}
 
 	if stmt == nil {
 		if v.status.HasErrors() {
 			v.stopFlag.SetSoft(true)
 		}
-		return 0, ErrNoStatement
+		return ErrNoStatement
 	}
 
 	for attempt := 1; attempt <= v.maxAttempts; attempt++ {
 		validatedRows, err := v.store.Check(ctx, v.table, stmt, attempt)
 		if err == nil {
 			metric.Add(float64(validatedRows))
+			v.status.AddValidatedRows(validatedRows)
 			v.status.ReadOp()
-			return validatedRows, nil
+			return nil
 		}
 
 		if errors.Is(err, context.DeadlineExceeded) {
@@ -116,11 +117,11 @@ func (v *Validation) run(ctx context.Context, metric prometheus.Counter) (int, e
 		}
 
 		if errors.Is(err, context.Canceled) {
-			return 0, context.Canceled
+			return context.Canceled
 		}
 
 		if attempt == v.maxAttempts {
-			return 0, joberror.JobError{
+			return joberror.JobError{
 				Timestamp:     time.Now(),
 				Err:           acc,
 				StmtType:      stmt.QueryType,
@@ -134,7 +135,7 @@ func (v *Validation) run(ctx context.Context, metric prometheus.Counter) (int, e
 		time.Sleep(v.delay)
 	}
 
-	return 0, nil
+	return nil
 }
 
 func (v *Validation) Do(ctx context.Context) error {
@@ -147,18 +148,9 @@ func (v *Validation) Do(ctx context.Context) error {
 	validatedRowsMetric := metrics.ValidatedRows.WithLabelValues(v.table.Name)
 
 	for !v.stopFlag.IsHardOrSoft() {
-		var validatedRows int
-
 		err := executionTime.RunFuncE(func() error {
-			var err error
-			validatedRows, err = v.run(ctx, validatedRowsMetric)
-			return err
+			return v.run(ctx, validatedRowsMetric)
 		})
-
-		if err == nil {
-			v.status.AddValidatedRows(validatedRows)
-			continue
-		}
 
 		if errors.Is(err, utils.ErrNoPartitionKeyValues) {
 			time.Sleep(v.delay)

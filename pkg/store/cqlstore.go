@@ -120,9 +120,11 @@ func (e MutationError) Error() string {
 }
 
 func (c *cqlStore) mutate(ctx context.Context, stmt *typedef.Stmt, ts mo.Option[time.Time]) error {
-	var err error
 
-	query := c.session.Query(stmt.Query, stmt.Values...).WithContext(ctx)
+	query := c.session.Bind(stmt.Query, func(q *gocql.QueryInfo) ([]interface{}, error) {
+		return stmt.Values, nil
+	}).WithContext(ctx)
+
 	defer query.Release()
 
 	if !c.useServerSideTimestamps {
@@ -131,6 +133,8 @@ func (c *cqlStore) mutate(ctx context.Context, stmt *typedef.Stmt, ts mo.Option[
 		})
 		query.WithTimestamp(ts.MustGet().UnixMicro())
 	}
+
+	var acc error
 
 	for i := range c.maxRetriesMutate {
 		mutateErr := query.Exec()
@@ -149,7 +153,7 @@ func (c *cqlStore) mutate(ctx context.Context, stmt *typedef.Stmt, ts mo.Option[
 			return nil
 		}
 
-		err = multierr.Append(err, MutationError{
+		acc = multierr.Append(acc, MutationError{
 			Inner:         mutateErr,
 			PartitionKeys: stmt.PartitionKeys.Values,
 		})
@@ -160,11 +164,14 @@ func (c *cqlStore) mutate(ctx context.Context, stmt *typedef.Stmt, ts mo.Option[
 		time.Sleep(c.maxRetriesMutateSleep)
 	}
 
-	return err
+	return acc
 }
 
 func (c *cqlStore) load(ctx context.Context, stmt *typedef.Stmt) (Rows, error) {
-	query := c.session.Query(stmt.Query, stmt.Values...).WithContext(ctx)
+	query := c.session.Bind(stmt.Query, func(q *gocql.QueryInfo) ([]any, error) {
+		return stmt.Values, nil
+	}).WithContext(ctx)
+
 	iter := query.Iter()
 
 	defer func() {
@@ -172,15 +179,16 @@ func (c *cqlStore) load(ctx context.Context, stmt *typedef.Stmt) (Rows, error) {
 		c.cqlRequestsMetric[stmt.QueryType].Inc()
 	}()
 
-	rows := make(Rows, iter.NumRows())
+	rows := make(Rows, 0, iter.NumRows())
+	c.logger.Debug("loading rows", zap.String("query", stmt.Query))
 
-	for i := range iter.NumRows() {
+	for range iter.NumRows() {
 		row := make(Row, len(iter.Columns()))
 		if !iter.MapScan(row) {
 			return nil, iter.Close()
 		}
 
-		rows[i] = row
+		rows = append(rows, row)
 	}
 
 	return rows, iter.Close()
