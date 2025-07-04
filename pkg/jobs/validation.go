@@ -20,6 +20,7 @@ import (
 	"math/rand/v2"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/multierr"
 
 	"github.com/scylladb/gemini/pkg/generators"
@@ -87,26 +88,27 @@ func NewValidation(
 	}
 }
 
-func (v *Validation) run(ctx context.Context) error {
+func (v *Validation) run(ctx context.Context, metric prometheus.Counter) (int, error) {
 	var acc error
 
 	stmt, stmtErr := v.statement.Select(ctx)
 	if errors.Is(stmtErr, utils.ErrNoPartitionKeyValues) {
-		return utils.ErrNoPartitionKeyValues
+		return 0, utils.ErrNoPartitionKeyValues
 	}
 
 	if stmt == nil {
 		if v.status.HasErrors() {
 			v.stopFlag.SetSoft(true)
 		}
-		return ErrNoStatement
+		return 0, ErrNoStatement
 	}
 
 	for attempt := 1; attempt <= v.maxAttempts; attempt++ {
-		err := v.store.Check(ctx, v.table, stmt, attempt)
+		validatedRows, err := v.store.Check(ctx, v.table, stmt, attempt)
 		if err == nil {
+			metric.Add(float64(validatedRows))
 			v.status.ReadOp()
-			return nil
+			return validatedRows, nil
 		}
 
 		if errors.Is(err, context.DeadlineExceeded) {
@@ -114,11 +116,11 @@ func (v *Validation) run(ctx context.Context) error {
 		}
 
 		if errors.Is(err, context.Canceled) {
-			return context.Canceled
+			return 0, context.Canceled
 		}
 
 		if attempt == v.maxAttempts {
-			return joberror.JobError{
+			return 0, joberror.JobError{
 				Timestamp:     time.Now(),
 				Err:           acc,
 				StmtType:      stmt.QueryType,
@@ -132,7 +134,7 @@ func (v *Validation) run(ctx context.Context) error {
 		time.Sleep(v.delay)
 	}
 
-	return nil
+	return 0, nil
 }
 
 func (v *Validation) Do(ctx context.Context) error {
@@ -142,10 +144,21 @@ func (v *Validation) Do(ctx context.Context) error {
 	metrics.GeminiInformation.WithLabelValues("validation_" + v.table.Name).Inc()
 	defer metrics.GeminiInformation.WithLabelValues("validation_" + v.table.Name).Dec()
 
+	validatedRowsMetric := metrics.ValidatedRows.WithLabelValues(v.table.Name)
+
 	for !v.stopFlag.IsHardOrSoft() {
+		var validatedRows int
+
 		err := executionTime.RunFuncE(func() error {
-			return v.run(ctx)
+			var err error
+			validatedRows, err = v.run(ctx, validatedRowsMetric)
+			return err
 		})
+
+		if err == nil {
+			v.status.AddValidatedRows(validatedRows)
+			continue
+		}
 
 		if errors.Is(err, utils.ErrNoPartitionKeyValues) {
 			time.Sleep(v.delay)

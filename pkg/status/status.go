@@ -36,11 +36,12 @@ func (u *Uint64) MarshalJSON() ([]byte, error) {
 }
 
 type GlobalStatus struct {
-	Errors      *joberror.ErrorList `json:"errors,omitempty"`
-	WriteOps    Uint64              `json:"write_ops"`
-	WriteErrors Uint64              `json:"write_errors"`
-	ReadOps     Uint64              `json:"read_ops"`
-	ReadErrors  Uint64              `json:"read_errors"`
+	Errors        *joberror.ErrorList `json:"errors,omitempty"`
+	WriteOps      Uint64              `json:"write_ops"`
+	WriteErrors   Uint64              `json:"write_errors"`
+	ReadOps       Uint64              `json:"read_ops"`
+	ValidatedRows Uint64              `json:"validated_rows,omitempty"`
+	ReadErrors    Uint64              `json:"read_errors"`
 }
 
 func (gs *GlobalStatus) AddWriteError(err joberror.JobError) {
@@ -120,6 +121,10 @@ func (gs *GlobalStatus) WriteOp() {
 
 func (gs *GlobalStatus) ReadOp() {
 	gs.ReadOps.Add(1)
+}
+
+func (gs *GlobalStatus) AddValidatedRows(rows int) {
+	gs.ValidatedRows.Add(uint64(rows))
 }
 
 func NewGlobalStatus(limit int) *GlobalStatus {
