@@ -180,7 +180,7 @@ func (c *cqlStore) load(ctx context.Context, stmt *typedef.Stmt) (Rows, error) {
 	}()
 
 	rows := make(Rows, 0, iter.NumRows())
-	c.logger.Debug("loading rows", zap.String("query", stmt.Query))
+	c.logger.Debug("loading rows", zap.String("query", stmt.Query), zap.Int("num_rows", iter.NumRows()))
 
 	for range iter.NumRows() {
 		row := make(Row, len(iter.Columns()))
