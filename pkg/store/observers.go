@@ -17,6 +17,7 @@ package store
 import (
 	"context"
 	"errors"
+	"slices"
 	"sync"
 
 	"github.com/gocql/gocql"
@@ -131,17 +132,18 @@ func (c *ClusterObserver) ObserveQuery(ctx context.Context, query gocql.Observed
 
 	if c.logger != nil && !data.Statement.QueryType.IsSelect() {
 		err := c.logger.LogStmt(stmtlogger.Item{
-			Error:         mo.Left[error, string](query.Err),
-			Statement:     query.Statement,
-			Values:        mo.Left[[]any, []byte](data.Statement.Values),
-			Start:         stmtlogger.Time{Time: query.Start},
-			Duration:      stmtlogger.Duration{Duration: duration},
-			Host:          instance,
-			Attempt:       query.Metrics.Attempts,
-			GeminiAttempt: data.GeminiAttempt,
-			Type:          c.clusterName,
-			StatementType: data.Statement.QueryType,
-			PartitionKeys: data.Statement.PartitionKeys.Values,
+			Error:           mo.Left[error, string](query.Err),
+			Statement:       query.Statement,
+			GeneratedValues: mo.Left[[]any, []byte](data.Statement.Values),
+			DriverValues:    slices.Clone(query.Values),
+			Start:           stmtlogger.Time{Time: query.Start},
+			Duration:        stmtlogger.Duration{Duration: duration},
+			Host:            instance,
+			Attempt:         query.Metrics.Attempts,
+			GeminiAttempt:   data.GeminiAttempt,
+			Type:            c.clusterName,
+			StatementType:   data.Statement.QueryType,
+			PartitionKeys:   data.Statement.PartitionKeys.Values,
 		})
 		if err != nil {
 			c.appLogger.Error("failed to log batch statement", zap.Error(err), zap.Any("query", query))
